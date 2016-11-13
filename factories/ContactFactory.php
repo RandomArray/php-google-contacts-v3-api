@@ -51,14 +51,14 @@ abstract class ContactFactory
                         $attributes = $value->attributes();
                         $emailadress = (string) $attributes['address'];
                         $emailtype = substr(strstr($attributes['rel'], '#'), 1);
-                        $contactDetails[$key][] = ['type' => $emailtype, 'email' => $emailadress];
+                        $contactDetails[$key][$emailtype] = $emailadress;
                         break;
                     case 'phoneNumber':
                         $attributes = $value->attributes();
                         $uri = (string) $attributes['uri'];
                         $type = substr(strstr($attributes['rel'], '#'), 1);
                         $e164 = substr(strstr($uri, ':'), 1);
-                        $contactDetails[$key][] = ['type' => $type, 'number' => $e164];
+                        $contactDetails[$key][$type] = $e164;
                         break;
                     default:
                         $contactDetails[$key] = (string) $value;
@@ -197,7 +197,7 @@ abstract class ContactFactory
         return new Contact($contactDetails);
     }
 
-    public static function create($name, $phoneNumber, $emailAddress)
+    public static function create($label, $firstName, $lastName, $phoneNumber, $emailAddress)
     {
         $doc = new \DOMDocument();
         $doc->formatOutput = true;
@@ -207,14 +207,39 @@ abstract class ContactFactory
         $entry->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:gd', 'http://schemas.google.com/g/2005');
         $doc->appendChild($entry);
 
-        $title = $doc->createElement('title', $name);
+
+        $full_name = $label.' - '.$firstName.' '.$lastName;
+        
+        $title = $doc->createElement('title', $full_name);
         $entry->appendChild($title);
+
+
+
+        // Adds a label, first & last name, and a phonetic tag. The prepended label breaks calling contact by voice command...
+        
+        // Contact: Label Name - Tom Smith
+        // Phonetic: Tom Smith
+        // Use voice command to dial by saying, "call Tom Smith"
+        
+        $name = $doc->createElement('gd:name');
+        $entry->appendChild($name);
+        $givenName = $doc->createElement('gd:givenName', $label.' - '.$firstName);
+        $givenName->setAttribute('yomi', $firstName);
+        $familyName = $doc->createElement('gd:familyName', $lastName);
+        $familyName->setAttribute('yomi', $lastName);
+        $fullName = $doc->createElement('gd:fullName', $full_name);
+        $name->appendChild($givenName);
+        $name->appendChild($familyName);
+        $name->appendChild($fullName);
+        $entry->appendChild($name);
 
         $email = $doc->createElement('gd:email');
         $email->setAttribute('rel', 'http://schemas.google.com/g/2005#work');
         $email->setAttribute('address', $emailAddress);
         $entry->appendChild($email);
 
+
+        
         $contact = $doc->createElement('gd:phoneNumber', $phoneNumber);
         $contact->setAttribute('rel', 'http://schemas.google.com/g/2005#work');
         $entry->appendChild($contact);
